@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Convert CSV — ERA5 Wind Tool</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="page-wrap">
+  {% include 'sidebar.html' %}
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>Convert Downloaded Data to CSV</h1>
+      <p>Browse your downloaded files, rename them, and convert NetCDF to CSV.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="card-title">Upload .nc From Computer</div>
+      <div class="card-subtitle">Choose your local NetCDF file and convert it directly. Optional: rename output CSV.</div>
+      <div id="upload-alert"></div>
+      <div class="form-grid-2">
+        <div class="form-group">
+          <label>Select .nc File</label>
+          <input type="file" id="upload_nc_file" accept=".nc">
+        </div>
+        <div class="form-group">
+          <label>Rename Output CSV (Optional)</label>
+          <input type="text" id="upload_output_name" placeholder="e.g. bonala_wind_2018">
+        </div>
+      </div>
+      <button class="btn btn-primary" id="upload-convert-btn" onclick="convertUploadedNc()">
+        Convert Uploaded NC to CSV
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">File Converter</div>
+      <div class="card-subtitle">Only your files are listed below</div>
+      <div id="convert-alert"></div>
+      <div class="table-wrap" id="convert-table">
+        <p style="color:var(--muted)">Loading files...</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+requireAuth();
+setActiveNav();
+
+function showPageAlert(msg, type = 'info') {
+  document.getElementById('convert-alert').innerHTML =
+    `<div class="alert alert-${type}" style="margin-bottom:16px">${msg}</div>`;
+}
+
+function showUploadAlert(msg, type = 'info') {
+  document.getElementById('upload-alert').innerHTML =
+    `<div class="alert alert-${type}" style="margin-bottom:16px">${msg}</div>`;
+}
+
+function bytesToSize(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
+}
+
+async function loadConvertFiles() {
+  const wrap = document.getElementById('convert-table');
+  const r = await apiCall('GET', '/download-files?include_uploaded=1');
+  const files = r.ok ? r.data.files : [];
+
+  if (!r.ok) {
+    wrap.innerHTML = '<p style="color:var(--red);padding:12px 0">Unable to load files.</p>';
+    return;
+  }
+
+  if (!files.length) {
+    wrap.innerHTML = '<p style="color:var(--muted);padding:12px 0">No files found. Submit a request first.</p>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Place</th>
+          <th>Request</th>
+          <th>Type</th>
+          <th>File Name</th>
+          <th>Size</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${files.map(file => `
+          <tr>
+            <td>${file.place_name}</td>
+            <td>#${file.request_id}</td>
+            <td style="text-transform:uppercase">${file.file_type}</td>
+            <td style="font-size:11px;word-break:break-all">${file.file_name}</td>
+            <td>${bytesToSize(file.size_bytes)}</td>
+            <td style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${file.source === 'uploaded'
+                ? `<a href="#" class="btn btn-sm btn-green" onclick="downloadUploadedFile('${file.file_name}'); return false;">Download</a>`
+                : downloadBtn(file.request_id, file.file_type, 'Download', false)}
+              ${file.source === 'uploaded'
+                ? `<span style="color:var(--muted);font-size:11px">Rename via output name on convert</span>`
+                : `<a href="#" class="btn btn-sm btn-secondary"
+                    onclick="renameDownloadFile(${file.request_id}, '${file.file_type}', '${file.file_name}'); return false;">Rename</a>`}
+              ${file.file_type === 'nc' && file.source !== 'uploaded'
+                ? `<a href="#" class="btn btn-sm btn-primary" onclick="convertNcToCsv(${file.request_id}); return false;">Convert to CSV</a>`
+                : ''}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function downloadUploadedFile(fileName) {
+  const token = localStorage.getItem('era5_token');
+  const res = await fetch(`/api/download-uploaded/${encodeURIComponent(fileName)}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    showToast('Unable to download uploaded file', 'error');
+    return;
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function renameDownloadFile(requestId, fileType, oldName) {
+  const newName = prompt('Enter new file name', oldName);
+  if (!newName || newName.trim() === oldName) return;
+
+  const r = await apiCall('POST', `/rename-download/${requestId}/${fileType}`, {
+    new_name: newName.trim()
+  });
+  if (!r.ok) {
+    showToast(r.data.error || 'Rename failed', 'error');
+    return;
+  }
+  showToast('File renamed successfully', 'success');
+  await loadConvertFiles();
+}
+
+async function convertNcToCsv(requestId) {
+  const csvName = prompt('Optional CSV filename:', '');
+  const payload = (csvName && csvName.trim()) ? { csv_name: csvName.trim() } : {};
+
+  const r = await apiCall('POST', `/convert-nc/${requestId}`, payload);
+  if (!r.ok) {
+    showToast(r.data.error || 'Conversion failed', 'error');
+    return;
+  }
+  showPageAlert(`✅ ${r.data.message}. CSV: ${r.data.csv_file}`, 'success');
+  await loadConvertFiles();
+}
+
+async function convertUploadedNc() {
+  const outputName = document.getElementById('upload_output_name').value.trim();
+  const fileInput = document.getElementById('upload_nc_file');
+  const file = fileInput.files[0];
+  const btn = document.getElementById('upload-convert-btn');
+
+  if (!file) { showUploadAlert('Please choose a .nc file', 'error'); return; }
+  if (!String(file.name).toLowerCase().endsWith('.nc')) { showUploadAlert('Only .nc files are supported', 'error'); return; }
+
+  const form = new FormData();
+  form.append('nc_file', file);
+  if (outputName) form.append('output_name', outputName);
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Converting...';
+
+  try {
+    const token = localStorage.getItem('era5_token');
+    const res = await fetch('/api/convert-uploaded-nc', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: form
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showUploadAlert(data.error || 'Upload conversion failed', 'error');
+      return;
+    }
+
+    showUploadAlert(`✅ ${data.message}. CSV: ${data.csv_file}`, 'success');
+    fileInput.value = '';
+    await loadConvertFiles();
+  } catch (err) {
+    showUploadAlert('Unexpected error while converting uploaded file', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Convert Uploaded NC to CSV';
+  }
+}
+
+async function init() {
+  const user = await loadUserInfo();
+  if (!user) return;
+  await loadConvertFiles();
+}
+
+init();
+</script>
+</body>
+</html>

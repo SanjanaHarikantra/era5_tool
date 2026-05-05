@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — ERA5 Wind Tool</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="page-wrap">
+  {% include 'sidebar.html' %}
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>Dashboard</h1>
+      <p>Overview of your ERA5 wind data requests</p>
+    </div>
+
+    <!-- CDS Registration Banner -->
+    <div class="cds-box" id="cds-banner">
+      <h3>⚡ Connect to Copernicus Climate Data Store</h3>
+      <p>
+        To download ERA5 wind data, you need a free CDS account and an API key.<br>
+        <strong>Step 1:</strong>
+        <a href="https://cds.climate.copernicus.eu" target="_blank">Create your account at cds.climate.copernicus.eu</a><br>
+        <strong>Step 2:</strong> Copy your API key from your CDS profile.<br>
+        <strong>Step 3:</strong> <a href="/profile">Paste it in your Profile page</a> here.
+      </p>
+    </div>
+
+    <!-- API key warning -->
+    <div class="alert alert-warning" id="no-key-warn" style="display:none">
+      ⚠️ You haven't saved a CDS API key yet.
+      <a href="/profile" style="color:inherit;font-weight:700;margin-left:4px">Go to Profile →</a>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Requests</div>
+        <div class="stat-value accent" id="stat-total">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value green" id="stat-completed">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Processing</div>
+        <div class="stat-value yellow" id="stat-processing">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Failed</div>
+        <div class="stat-value" style="color:var(--red)" id="stat-failed">—</div>
+      </div>
+    </div>
+
+    <!-- Recent requests -->
+    <div class="card">
+      <div class="card-title">Recent Requests</div>
+      <div class="card-subtitle">Your last 5 data downloads</div>
+      <div class="table-wrap" id="recent-table">
+        <p style="color:var(--muted)">Loading...</p>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;display:flex;gap:12px;">
+      <a href="/request-page" class="btn btn-primary">+ New Request</a>
+      <a href="/history" class="btn btn-secondary">View Full History</a>
+    </div>
+  </main>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+requireAuth();
+setActiveNav();
+
+async function loadDashboard() {
+  const user = await loadUserInfo();
+  if (!user) return;
+
+  if (!user.has_api_key) {
+    document.getElementById('no-key-warn').style.display = 'flex';
+  }
+
+  const r = await apiCall('GET', '/history');
+  const reqs = r.ok ? r.data.requests : [];
+
+  // Stats
+  document.getElementById('stat-total').textContent = reqs.length;
+  document.getElementById('stat-completed').textContent = reqs.filter(r => r.status === 'Completed').length;
+  document.getElementById('stat-processing').textContent = reqs.filter(r => r.status === 'Processing' || r.status === 'Pending').length;
+  document.getElementById('stat-failed').textContent = reqs.filter(r => r.status === 'Failed').length;
+
+  // Recent table
+  const recent = reqs.slice(0, 5);
+  const wrap = document.getElementById('recent-table');
+  if (!recent.length) {
+    wrap.innerHTML = `<p style="color:var(--muted);padding:12px 0">No requests yet. <a href="/request-page" style="color:var(--accent)">Make your first request →</a></p>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Place</th>
+          <th>Lat / Lon</th>
+          <th>Date Range</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${recent.map(req => `
+          <tr>
+            <td>${req.place_name}</td>
+            <td style="font-size:11px;color:var(--muted)">${req.latitude}, ${req.longitude}</td>
+            <td style="font-size:11px">${req.start_date} → ${req.end_date}</td>
+            <td>${statusBadge(req.status)}</td>
+            <td style="color:var(--muted);font-size:11px">${new Date(req.created_at).toLocaleDateString()}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+loadDashboard();
+</script>
+</body>
+</html>

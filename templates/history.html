@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>History — ERA5 Wind Tool</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="page-wrap">
+  {% include 'sidebar.html' %}
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>Request History</h1>
+      <p>All your ERA5 wind data requests</p>
+    </div>
+
+    <!-- Requests table -->
+    <div class="card">
+      <div class="card-title">All Requests</div>
+      <div class="card-subtitle">Download your processed data files</div>
+      <div class="table-wrap" id="history-table">
+        <p style="color:var(--muted)">Loading...</p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <div class="card-title">Downloaded Files Browser</div>
+      <div class="card-subtitle">Browse, rename, and convert NetCDF files to CSV</div>
+      <div class="table-wrap" id="downloads-table">
+        <p style="color:var(--muted)">Loading files...</p>
+      </div>
+    </div>
+
+    <div style="margin-top:24px;">
+      <a href="/request-page" class="btn btn-primary">+ New Request</a>
+    </div>
+  </main>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+requireAuth();
+setActiveNav();
+
+async function loadHistory() {
+  const user = await loadUserInfo();
+  if (!user) return;
+
+  const r = await apiCall('GET', '/history');
+  const reqs = r.ok ? r.data.requests : [];
+
+  const wrap = document.getElementById('history-table');
+  if (!reqs.length) {
+    wrap.innerHTML = `<p style="color:var(--muted);padding:12px 0">No requests yet. <a href="/request-page" style="color:var(--accent)">Make your first request →</a></p>`;
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Place</th>
+          <th>Lat / Lon</th>
+          <th>Date Range</th>
+          <th>Status</th>
+          <th>Downloads</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${reqs.map(req => `
+          <tr>
+            <td>${req.place_name}</td>
+            <td style="font-size:11px;color:var(--muted)">${req.latitude}, ${req.longitude}</td>
+            <td style="font-size:11px">${req.start_date} → ${req.end_date}</td>
+            <td>${statusBadge(req.status)}</td>
+            <td>
+              ${req.status === 'Completed' ? `
+                ${downloadBtn(req.id, 'nc', 'NetCDF', !req.has_nc)}
+                ${downloadBtn(req.id, 'csv', 'Hourly CSV', !req.has_csv)}
+                ${downloadBtn(req.id, 'summary', 'Monthly Summary', !req.has_summary)}
+              ` : req.status === 'Failed' ? req.error_message || 'Failed' : 'Processing...'}
+            </td>
+            <td style="color:var(--muted);font-size:11px">${new Date(req.created_at).toLocaleDateString()}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+function bytesToSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
+}
+
+async function loadDownloadsBrowser() {
+  const wrap = document.getElementById('downloads-table');
+  const r = await apiCall('GET', '/download-files');
+  const files = r.ok ? r.data.files : [];
+
+  if (!files.length) {
+    wrap.innerHTML = '<p style="color:var(--muted);padding:12px 0">No downloaded files found yet.</p>';
+    return;
+  }
+
+  wrap.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Place</th>
+          <th>Type</th>
+          <th>File Name</th>
+          <th>Size</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${files.map(file => `
+          <tr>
+            <td>${file.place_name}</td>
+            <td style="text-transform:uppercase">${file.file_type}</td>
+            <td style="font-size:11px;word-break:break-all">${file.file_name}</td>
+            <td>${bytesToSize(file.size_bytes)}</td>
+            <td style="display:flex;gap:8px;flex-wrap:wrap;">
+              ${downloadBtn(file.request_id, file.file_type, 'Download', false)}
+              <a href="#" class="btn btn-sm btn-secondary" onclick="renameDownloadFile(${file.request_id}, '${file.file_type}', '${file.file_name}'); return false;">Rename</a>
+              ${file.file_type === 'nc' ? `<a href="#" class="btn btn-sm btn-primary" onclick="convertNcToCsv(${file.request_id}); return false;">Convert to CSV</a>` : ''}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+async function renameDownloadFile(requestId, fileType, oldName) {
+  const newName = prompt('Enter new file name', oldName);
+  if (!newName || newName.trim() === oldName) return;
+
+  const r = await apiCall('POST', `/rename-download/${requestId}/${fileType}`, { new_name: newName.trim() });
+  if (!r.ok) {
+    showToast(r.data.error || 'Rename failed', 'error');
+    return;
+  }
+  showToast('File renamed', 'success');
+  await loadDownloadsBrowser();
+  await loadHistory();
+}
+
+async function convertNcToCsv(requestId) {
+  const csvName = prompt('Optional CSV filename (without extension is okay):', '');
+  const body = csvName && csvName.trim() ? { csv_name: csvName.trim() } : {};
+  const r = await apiCall('POST', `/convert-nc/${requestId}`, body);
+  if (!r.ok) {
+    showToast(r.data.error || 'Conversion failed', 'error');
+    return;
+  }
+  showToast(`Converted: ${r.data.csv_file}`, 'success');
+  await loadDownloadsBrowser();
+  await loadHistory();
+}
+
+async function initHistoryPage() {
+  await loadHistory();
+  await loadDownloadsBrowser();
+}
+
+initHistoryPage();
+</script>
+</body>
+</html>

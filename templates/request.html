@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Request Data — ERA5 Wind Tool</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="page-wrap">
+  {% include 'sidebar.html' %}
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>Request ERA5 Wind Data</h1>
+      <p>Download 100m wind speed & direction data from Copernicus</p>
+    </div>
+
+    <div id="no-key-alert" class="alert alert-warning" style="display:none;max-width:640px;">
+      ⚠️ No CDS API key found.
+      <a href="/profile" style="color:inherit;font-weight:700;margin-left:4px">Set up your API key in Profile →</a>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start;max-width:900px;">
+
+      <!-- Request form -->
+      <div class="card">
+        <div class="card-title">Location & Date Range</div>
+        <div class="card-subtitle">Specify where and when to fetch ERA5 data</div>
+
+        <div id="form-alert"></div>
+
+        <div class="form-group">
+          <label>Place Name / Label</label>
+          <input type="text" id="place_name" placeholder="e.g. Mumbai Coast, Rajasthan Desert">
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Latitude <span style="color:var(--muted)">(-90 to 90)</span></label>
+            <input type="number" id="latitude" placeholder="e.g. 19.0760"
+              step="0.0001" min="-90" max="90">
+          </div>
+          <div class="form-group">
+            <label>Longitude <span style="color:var(--muted)">(-180 to 180)</span></label>
+            <input type="number" id="longitude" placeholder="e.g. 72.8777"
+              step="0.0001" min="-180" max="180">
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label>Start Date</label>
+            <input type="date" id="start_date">
+          </div>
+          <div class="form-group">
+            <label>End Date</label>
+            <input type="date" id="end_date">
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="submit-btn" onclick="submitRequest()">
+          🌬 Submit Data Request
+        </button>
+      </div>
+
+      <!-- Info panel -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div class="card">
+          <div class="card-title" style="font-size:14px">What you'll get</div>
+          <ul style="padding-left:16px;display:flex;flex-direction:column;gap:8px;color:var(--text);font-size:12px;margin-top:12px;">
+            <li><span style="color:var(--green)">✓</span> Raw NetCDF file (.nc)</li>
+            <li><span style="color:var(--green)">✓</span> Hourly CSV with U & V wind components</li>
+            <li><span style="color:var(--green)">✓</span> Wind speed (m/s & km/h)</li>
+            <li><span style="color:var(--green)">✓</span> Wind direction (degrees)</li>
+            <li><span style="color:var(--green)">✓</span> Power density (W/m²)</li>
+            <li><span style="color:var(--green)">✓</span> Monthly summary CSV</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="font-size:14px">Variables</div>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:11px;background:var(--bg);padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+              <span style="color:var(--accent)">U100</span> — 100m U-component of wind
+            </div>
+            <div style="font-size:11px;background:var(--bg);padding:8px 10px;border-radius:6px;border:1px solid var(--border);">
+              <span style="color:var(--accent)">V100</span> — 100m V-component of wind
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title" style="font-size:14px">Tips</div>
+          <ul style="padding-left:16px;display:flex;flex-direction:column;gap:8px;color:var(--muted);font-size:12px;margin-top:12px;line-height:1.5;">
+            <li>Keep date ranges ≤ 1 year for faster downloads</li>
+            <li>Processing runs in background — check History</li>
+            <li>ERA5 data is available from 1940 to present</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/static/app.js"></script>
+<script>
+requireAuth();
+setActiveNav();
+
+async function init() {
+  const user = await loadUserInfo();
+  if (!user) return;
+  if (!user.has_api_key) {
+    document.getElementById('no-key-alert').style.display = 'flex';
+  }
+  // Default dates
+  const today = new Date();
+  const lastYear = new Date(today);
+  lastYear.setFullYear(today.getFullYear() - 1);
+  document.getElementById('end_date').value = today.toISOString().split('T')[0];
+  document.getElementById('start_date').value = lastYear.toISOString().split('T')[0];
+}
+
+function showFormAlert(msg, type = 'error') {
+  document.getElementById('form-alert').innerHTML =
+    `<div class="alert alert-${type}" style="margin-bottom:16px">${msg}</div>`;
+}
+
+async function submitRequest() {
+  const btn = document.getElementById('submit-btn');
+
+  const place_name  = document.getElementById('place_name').value.trim();
+  const latitude    = parseFloat(document.getElementById('latitude').value);
+  const longitude   = parseFloat(document.getElementById('longitude').value);
+  const start_date  = document.getElementById('start_date').value;
+  const end_date    = document.getElementById('end_date').value;
+
+  if (!place_name)          { showFormAlert('Place name is required'); return; }
+  if (isNaN(latitude))      { showFormAlert('Enter a valid latitude'); return; }
+  if (isNaN(longitude))     { showFormAlert('Enter a valid longitude'); return; }
+  if (!start_date || !end_date) { showFormAlert('Select start and end dates'); return; }
+  if (start_date >= end_date)   { showFormAlert('End date must be after start date'); return; }
+
+  btn.innerHTML = '<span class="spinner"></span> Submitting...';
+  btn.disabled = true;
+
+  const r = await apiCall('POST', '/request-data', {
+    place_name, latitude, longitude, start_date, end_date
+  });
+
+  if (r.ok) {
+    showFormAlert(`✅ ${r.data.message} Request ID: #${r.data.request_id}`, 'success');
+    btn.innerHTML = '🌬 Submit Data Request';
+    btn.disabled = false;
+    setTimeout(() => window.location.href = '/history', 2000);
+  } else {
+    showFormAlert(r.data.error || 'Submission failed');
+    btn.innerHTML = '🌬 Submit Data Request';
+    btn.disabled = false;
+  }
+}
+
+init();
+</script>
+</body>
+</html>

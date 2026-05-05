@@ -1,0 +1,61 @@
+<!-- Sidebar navigation shared across dashboard pages -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">🌬 ERA5</div>
+    <h2>Wind Data<br>Downloader</h2>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="/dashboard" class="nav-item" id="nav-dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      Dashboard
+    </a>
+    <a href="/request-page" class="nav-item" id="nav-request">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      Request Data
+    </a>
+    <a href="/history" class="nav-item" id="nav-history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      History
+    </a>
+    <a href="/convert-csv" class="nav-item" id="nav-convert">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Convert CSV
+    </a>
+    <a href="/profile" class="nav-item" id="nav-profile">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+      Profile
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div style="font-size:11px;color:var(--muted);padding:0 12px 10px;font-weight:700;">
+      Signed in as
+    </div>
+    <div style="font-size:12px;color:var(--text);padding:0 12px 12px;word-break:break-all;" id="nav-user-name">—</div>
+    <button id="logout-btn" onclick="logout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Logout
+    </button>
+  </div>
+</div>
