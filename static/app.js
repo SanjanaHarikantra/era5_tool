@@ -46,6 +46,7 @@ function setActiveNav() {
     '/history':      'nav-history',
     '/convert-csv':  'nav-convert',
     '/profile':      'nav-profile',
+    '/about':        'nav-about',
   };
   const id = map[path];
   if (id) document.getElementById(id)?.classList.add('active');

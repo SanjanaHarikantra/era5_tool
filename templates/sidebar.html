@@ -1,8 +1,13 @@
 <!-- Sidebar navigation shared across dashboard pages -->
 <div class="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-mark">🌬 ERA5</div>
-    <h2>Wind Data<br>Downloader</h2>
+    <a href="/dashboard" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:8px;">
+      <img src="/static/1.png" alt="ERA5 Logo" style="width:50px;height:50px;object-fit:contain;border-radius: 20px;">
+      <div>
+        <div class="logo-mark">ERA5</div>
+        <h2 style="font-size:13px;margin-top:2px;">Wind Data</h2>
+      </div>
+    </a>
   </div>
 
   <nav class="sidebar-nav">
@@ -41,6 +46,14 @@
         <circle cx="12" cy="7" r="4"/>
       </svg>
       Profile
+    </a>
+    <a href="/about" class="nav-item" id="nav-about">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="16" x2="12" y2="12"/>
+        <line x1="12" y1="8" x2="12.01" y2="8"/>
+      </svg>
+      About Us
     </a>
   </nav>
 

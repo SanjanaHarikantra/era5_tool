@@ -3,23 +3,22 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from flask_cors import CORS
-from database import db, bcrypt, jwt
+from database import db
 import os
 
 app = Flask(__name__)
 CORS(app)
 
 # Configuration
-import os
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+app.config['SECRET_KEY'] = 'era5-wind-tool-secret-2024'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = 'era5-jwt-secret-2024'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False
 
 db.init_app(app)
-bcrypt.init_app(app)
-jwt.init_app(app)
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
 
 # Import models and routes AFTER db init
 from models import User, Request as DataRequest
@@ -60,9 +59,13 @@ def history_page():
 def convert_csv_page():
     return render_template('convert_csv.html')
 
+@app.route('/about')
+def about_page():
+    return render_template('about_us.html')
+
 if __name__ == '__main__':
     with app.app_context():
         os.makedirs('downloads', exist_ok=True)
         db.create_all()
-        print("✅ Database initialized")
+        print(" Database initialized")
     app.run(debug=True, port=5000)
