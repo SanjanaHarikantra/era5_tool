@@ -28,7 +28,6 @@ The ERA5 Wind Data Processing Tool is a web-based application that enables users
 * HTML
 * CSS
 * JavaScript
-* Jinja2 Templates
 
 ### Backend
 
