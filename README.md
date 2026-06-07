@@ -1,9 +1,6 @@
 # ERA5 Wind Data Processing Tool
 
 ## 🌐 Live Demo
-
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Visit%20Website-success)](https://era5-tool.onrender.com)
-
 🔗 https://era5-tool.onrender.com
 Try the application online to retrieve and analyze ERA5 wind data directly from the browser.
 
