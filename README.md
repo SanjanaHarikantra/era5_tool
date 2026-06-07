@@ -71,9 +71,10 @@ The ERA5 Wind Data Processing Tool is a web-based application that enables users
 * Improved processing performance.
 * Cloud deployment and scalability.
 
-## Author
+## Authors
 
 **Sanjana Harikantra**
+
 **Vaishnavi Tandel**
 
 
